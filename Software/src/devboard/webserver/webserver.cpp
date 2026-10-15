@@ -488,10 +488,10 @@ void init_webserver() {
       "DBLBTR",       "CNTCTRL",       "CNTCTRLDBL", "PWMCNTCTRL",   "PERBMSRESET",   "STATICIP",       "REMBMSRESET",
       "EXTPRECHARGE", "USBENABLED",    "CANLOGUSB",  "WEBENABLED",   "WIFIAPENABLED", "MQTTENABLED",    "NOINVDISC",
       "HADISC",       "MQTTCELLV",     "GTWRHD",     "DIGITALHVIL",  "PERFPROFILE",   "INTERLOCKREQ",   "SOCESTIMATED",
-      "PYLONOFFSET",  "PYLONORDER",    "DEYEBYD",    "DEYEVLIM",   "NCCONTACTOR",  "TRIBTR",        "CNTCTRLTRI",     "ESPNOWENABLED",
+      "PYLONOFFSET",  "PYLONORDER",    "DEYEBYD",    "NCCONTACTOR",  "TRIBTR",        "CNTCTRLTRI",     "ESPNOWENABLED",
       "PRIMOGEN24",   "LOWPASSFILTER", "WEBAUTH",    "SLOWCANINV",   "CHGTAPERSOC",   "MEASURECPUTEMP", "SYSLOGEN",
       "PERBMSDEFSOC", "PERBMSSKIPBAL", "INVOFFGRID", "CHGESTIMATED", "MQTTHEAP",      "HADISCFWU",      "INVACCREB",
-      "LEAFAUTOOFS",
+      "LEAFAUTOOFS",  "DEYEVLIM",
 #ifndef SMALL_FLASH_DEVICE
       "CTINVERT",
 #endif  // SMALL_FLASH_DEVICE
@@ -507,7 +507,7 @@ void init_webserver() {
       "GTWMAPREG",     "GTWCHASSIS",    "GTWPACK",       "LEDMODE",    "GPIOOPT1",    "GPIOOPT2",     "GPIOOPT3",
       "INVSUNTYPE",    "GPIOOPT4",      "PYLONBAUD",     "PYLONBRAND", "DALYPWRPCT",  "DALYPWRDV",    "DALYDVSTART",
       "DALYPWRDEG",    "DALYPWR0C",     "GPIOOPT5",      "GPIOOPT6",   "INVICNT",     "FOXESSTYPE",   "FOXESSSUBTYPE",
-      "FOXESSMODULES", "CHGTAPERSTART", "CHGTAPERFLOOR", "SYSLOGPORT", "SYSLOGFAC",   "PERBMSRESETH", "DEYESOCMIN", "DEYESOCMAX",
+      "FOXESSMODULES", "CHGTAPERSTART", "CHGTAPERFLOOR", "SYSLOGPORT", "SYSLOGFAC",   "PERBMSRESETH",
 #ifndef SMALL_FLASH_DEVICE
       "CTVNOM",        "CTANOM",        "QNHIPN",        "QNHVO",
 #endif  // SMALL_FLASH_DEVICE
@@ -985,6 +985,14 @@ void init_webserver() {
   // Route for editing SOCMin
   update_string_setting("/updateSocMin", [](String value) {
     datalayer.battery_settings.min_percentage = static_cast<uint16_t>(value.toFloat() * 100);
+  });
+
+  // Routes for editing Deye voltage limit SOC window
+  update_int_setting("/updateDeyeSocMin", [](int value) {
+    user_selected_inverter_deye_soc_min = static_cast<uint8_t>(constrain(value, 0, 50));
+  });
+  update_int_setting("/updateDeyeSocMax", [](int value) {
+    user_selected_inverter_deye_soc_max = static_cast<uint8_t>(constrain(value, 50, 100));
   });
 
   // Route for editing MaxChargeA

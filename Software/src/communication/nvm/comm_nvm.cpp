@@ -412,6 +412,8 @@ void store_settings() {
   settings.saveBool("USEVOLTLIMITS", datalayer.battery_settings.user_set_voltage_limits_active);
   settings.saveUInt("TARGETCHVOLT", datalayer.battery_settings.max_user_set_charge_voltage_dV);
   settings.saveUInt("TARGETDISCHVOLT", datalayer.battery_settings.max_user_set_discharge_voltage_dV);
+  settings.saveUInt("DEYESOCMIN", user_selected_inverter_deye_soc_min);
+  settings.saveUInt("DEYESOCMAX", user_selected_inverter_deye_soc_max);
   settings.saveUInt("BMSRESETDUR", datalayer.battery_settings.user_set_bms_reset_duration_ms);
   settings.saveUInt("BYDAUTOCALDRIFT", datalayer_extended.bydAtto3.auto_calibrate_soc_drift_percent);
   settings.saveBool("BYDAUTOCALEN", datalayer_extended.bydAtto3.auto_calibrate_soc_enabled);

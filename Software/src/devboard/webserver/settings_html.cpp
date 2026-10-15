@@ -1073,10 +1073,13 @@ String raw_settings_processor(const String& var, BatteryEmulatorSettingsStore& s
     return settings.getBool("DEYEVLIM") ? "checked" : "";
   }
   if (var == "DEYESOCMIN") {
-    return String(settings.getUInt("DEYESOCMIN", 10));
+    return String(user_selected_inverter_deye_soc_min);
   }
   if (var == "DEYESOCMAX") {
-    return String(settings.getUInt("DEYESOCMAX", 100));
+    return String(user_selected_inverter_deye_soc_max);
+  }
+  if (var == "DEYE_VLIM_CLASS") {
+    return user_selected_inverter_deye_voltage_limit ? "active" : "inactive";
   }
 
   if (var == "PRIMOGEN24") {
@@ -1458,6 +1461,12 @@ String qnhck_zero_text(uint16_t zero_mV) {
         XMLHttpRequest();xhr.onload=editComplete;xhr.onerror=editError;xhr.open('GET','/updateSocMax?value='+value,true);xhr.send();}else{alert('Invalid value. Please enter a value between 50.0 and 100.0');}}}
     
 
+
+        function editDeyeSocMin(){var value=prompt('Deye stops discharging when real SOC reaches this value (0-50):');if(value!==null){if(value>=0&&value<=50){var xhr=new 
+        XMLHttpRequest();xhr.onload=editComplete;xhr.onerror=editError;xhr.open('GET','/updateDeyeSocMin?value='+value,true);xhr.send();}else{alert('Invalid value. Please enter a value between 0 and 50');}}}
+
+        function editDeyeSocMax(){var value=prompt('Deye stops charging when real SOC reaches this value (50-100):');if(value!==null){if(value>=50&&value<=100){var xhr=new 
+        XMLHttpRequest();xhr.onload=editComplete;xhr.onerror=editError;xhr.open('GET','/updateDeyeSocMax?value='+value,true);xhr.send();}else{alert('Invalid value. Please enter a value between 50 and 100');}}}
 
         function editSocMin(){
           var value=prompt('Inverter will see completely discharged (0pct)SOC when this value is reached. Advanced users can set to negative values. Enter new minimum SOC value that battery will discharge to (-10.0to50.0):');
@@ -2188,13 +2197,9 @@ String qnhck_zero_text(uint16_t zero_mV) {
         <label>Deye avoid over/undercharge fix: </label>
         <input type='checkbox' name='DEYEBYD' value='on' %DEYEBYD% />
 
-        <label>Deye stop via voltage limit, SOC min/max %: </label>
-        <div style='display: flex; gap: 6px; align-items: center;'>
+        <label>Deye stop via voltage limit: </label>
         <input type='checkbox' name='DEYEVLIM' value='on' %DEYEVLIM%
-        title="Deye ignores 0A limits. Freeze voltage limit at real SOC min/max so it stops discharging/charging" />
-        <input name='DEYESOCMIN' type='text' value="%DEYESOCMIN%" pattern="[0-9]+" style='width: 3em;' title="Stop discharging at this real SOC %" />
-        <input name='DEYESOCMAX' type='text' value="%DEYESOCMAX%" pattern="[0-9]+" style='width: 3em;' title="Stop charging at this real SOC %" />
-        </div>
+        title="Deye ignores 0A limits. Freeze voltage limit at SOC min/max (set in the box below) so it stops" />
         </div>
 
         <div class="if-bydmodbus">
@@ -2538,6 +2543,10 @@ String qnhck_zero_text(uint16_t zero_mV) {
       <h4 class='%SOC_SCALING_ACTIVE_CLASS%'><span>SOC max percentage: %SOC_MAX_PERCENTAGE%</span> <button onclick='editSocMax()'>Edit</button></h4>
 
       <h4 class='%SOC_SCALING_ACTIVE_CLASS%'><span>SOC min percentage: %SOC_MIN_PERCENTAGE%</span> <button onclick='editSocMin()'>Edit</button></h4>
+
+      <h4 class='%DEYE_VLIM_CLASS%'><span>Deye stop discharge at real SOC, percent: %DEYESOCMIN%</span> <button onclick='editDeyeSocMin()'>Edit</button></h4>
+
+      <h4 class='%DEYE_VLIM_CLASS%'><span>Deye stop charge at real SOC, percent: %DEYESOCMAX%</span> <button onclick='editDeyeSocMax()'>Edit</button></h4>
       
       <h4 data-h=maxchga>Max charge current: %MAX_CHARGE_SPEED% A </span> <button onclick='editMaxChargeA()'>Edit</button></h4>
 
