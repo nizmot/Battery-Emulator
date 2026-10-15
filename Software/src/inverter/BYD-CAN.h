@@ -16,6 +16,7 @@ class BydCanInverter : public CanInverterProtocol {
 
  private:
   void send_initial_data();
+  void update_deye_discharge_block();
   unsigned long previousMillis2s = 0;   // will store last time a 2s CAN Message was send
   unsigned long previousMillis10s = 0;  // will store last time a 10s CAN Message was send
   unsigned long previousMillis60s = 0;  // will store last time a 60s CAN Message was send
@@ -30,6 +31,14 @@ class BydCanInverter : public CanInverterProtocol {
   static const uint8_t FW_MAJOR_VERSION = 0x03;
   static const uint8_t FW_MINOR_VERSION = 0x29;
   static const uint8_t VOLTAGE_OFFSET_DV = 20;
+  static const uint8_t DEYE_BLOCK_STEP_DV = 5;               // Raise cutoff by 0.5V if inverter keeps discharging
+  static const uint8_t DEYE_BLOCK_MAX_OFFSET_DV = 20;        // Never report cutoff more than 2.0V above pack voltage
+  static const int16_t DEYE_DISCHARGING_DA = -10;            // Below -1.0A counts as inverter still discharging
+  static const uint8_t DEYE_STEP_DELAY_S = 30;               // Seconds of discharging before raising cutoff
+  static const uint16_t DEYE_RELEASE_HYSTERESIS_PPTT = 200;  // Release block 2% above min SOC
+  bool deye_discharge_blocked = false;
+  uint16_t deye_block_voltage_dV = 0;
+  uint8_t deye_discharging_seconds = 0;
   bool initialDataSent = false;
   bool inverterStartedUp = false;
   bool useAsShunt = false;
