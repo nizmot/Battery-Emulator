@@ -133,6 +133,7 @@ void init_events(void) {
   events.entries[EVENT_BMS_RESET_REQ_SUCCESS].level = EVENT_LEVEL_INFO;
   events.entries[EVENT_BMS_RESET_REQ_FAIL].level = EVENT_LEVEL_INFO;
   events.entries[EVENT_BATTERY_TEMP_DEVIATION_HIGH].level = EVENT_LEVEL_WARNING;
+  events.entries[EVENT_DISCHARGE_LIMIT_IGNORED].level = EVENT_LEVEL_WARNING;
   events.entries[EVENT_GPIO_CONFLICT].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_GPIO_NOT_DEFINED].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_BATTERY_TEMP_DEVIATION_HIGH].level = EVENT_LEVEL_WARNING;
@@ -388,6 +389,8 @@ String get_event_message_string(EVENTS_ENUM_TYPE event) {
       return "BMS reset request completed successfully.";
     case EVENT_BMS_RESET_REQ_FAIL:
       return "BMS reset request failed - check contactors are open.";
+    case EVENT_DISCHARGE_LIMIT_IGNORED:
+      return "Inverter kept discharging while battery reported 0W allowed. Contactors opened, retrying in 15 minutes.";
     case EVENT_GPIO_CONFLICT:
       return "GPIO Pin Conflict: The pin used by '" + esp32hal->failed_allocator() + "' is already allocated by '" +
              esp32hal->conflicting_allocator() + "'. Please check your configuration and assign different pins.";
