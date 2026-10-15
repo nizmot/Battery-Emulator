@@ -10,18 +10,12 @@ static uint8_t charge_limit_failures = 0;
 static uint8_t discharge_limit_failures = 0;
 static bool battery_full_event_fired = false;
 static bool battery_empty_event_fired = false;
-static uint16_t overdischarge_seconds = 0;
-static uint16_t overdischarge_cutoff_seconds = 0;
-static bool overdischarge_cutoff_active = false;
 
 #define MAX_SOH_DEVIATION_PPTT 2500
 #define CELL_CRITICAL_MV 100  // If cells go this much outside design voltage, shut battery down!
 #define LOWEST_ALLOWED_CELLVOLTAGE_RECOVERY_CHARGE_MV 2000  //If cells are below this, recovery charge not allowed
 #define MAX_CHARGEPOWER_RECOVERY_CHARGE_DA 50
 #define HYSTERESIS_OFFSET_DV 20
-#define OVERDISCHARGE_CURRENT_DA -20     // Discharge current (-2.0A) treated as inverter ignoring a 0W limit
-#define OVERDISCHARGE_TRIP_SECONDS 60    // How long the inverter may ignore the limit before contactors open
-#define OVERDISCHARGE_RETRY_SECONDS 900  // How long contactors stay open before retrying (allows recharging)
 
 //battery pause status begin
 bool emulator_pause_request_ON = false;
@@ -184,32 +178,6 @@ void update_machineryprotection() {
         clear_event(EVENT_BATTERY_EMPTY);
         battery_empty_event_fired = false;
       }
-    }
-
-    // Inverter keeps discharging even though we report 0W allowed (seen on Deye inverters).
-    // As a last resort, open the contactors. Retry after a while so the battery can be recharged.
-    if (overdischarge_cutoff_active) {
-      if (!datalayer.system.info.equipment_stop_active) {  // User resumed manually via webserver
-        overdischarge_cutoff_active = false;
-        clear_event(EVENT_DISCHARGE_LIMIT_IGNORED);
-      } else if (++overdischarge_cutoff_seconds >= OVERDISCHARGE_RETRY_SECONDS) {
-        overdischarge_cutoff_active = false;
-        datalayer.system.info.equipment_stop_active = false;
-        clear_event(EVENT_DISCHARGE_LIMIT_IGNORED);
-      }
-    } else if (datalayer.system.status.system_status == ACTIVE && !datalayer.system.info.equipment_stop_active &&
-               datalayer.battery.status.max_discharge_power_W == 0 &&
-               datalayer.battery.status.current_dA <= OVERDISCHARGE_CURRENT_DA) {
-      if (++overdischarge_seconds >= OVERDISCHARGE_TRIP_SECONDS) {
-        overdischarge_seconds = 0;
-        overdischarge_cutoff_seconds = 0;
-        overdischarge_cutoff_active = true;
-        // Not stored to NVM and no EVENT_EQUIPMENT_STOP, so we do not enter latching FAULT state
-        datalayer.system.info.equipment_stop_active = true;
-        set_event(EVENT_DISCHARGE_LIMIT_IGNORED, 0);
-      }
-    } else {
-      overdischarge_seconds = 0;
     }
 
     // Battery is extremely degraded, not fit for secondlifestorage!
