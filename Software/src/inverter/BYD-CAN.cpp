@@ -65,7 +65,9 @@ void BydCanInverter::
       BYD_150.data.u8[0] = 0;
       BYD_150.data.u8[1] = 0;
     }
-    update_deye_discharge_block();
+  }
+  if (user_selected_inverter_deye_voltage_limit) {
+    update_deye_voltage_limits();
   }
   //StateOfHealth (100.00%)
   BYD_150.data.u8[2] = (datalayer.aggregate.soh_pptt >> 8);
@@ -102,55 +104,80 @@ void BydCanInverter::
   BYD_250.data.u8[5] = (uint8_t)(datalayer.aggregate.reported_total_capacity_Wh / 100);
 }
 
-void BydCanInverter::update_deye_discharge_block() {
-  // Deye ignores a 0A discharge limit and 0% SOC, but respects the discharge cutoff voltage.
-  // When SOC is at/below the min SOC setting (or battery allows no discharge), freeze the current pack voltage
-  // as cutoff. Since the pack sags while discharging, this is just below the resting voltage, so the inverter
-  // goes to standby instead of treating the battery as empty. If it still keeps discharging, step the cutoff up.
+void BydCanInverter::update_deye_voltage_limits() {
+  // Deye ignores 0A charge/discharge limits and 0%/100% SOC, but respects the voltage limits.
+  // When real SOC reaches the user set min/max, freeze the current pack voltage as discharge/charge limit.
+  // Since the pack sags while discharging (and rises while charging), the frozen value is just past the resting
+  // voltage, so the inverter goes to standby. If it still keeps going, step the limit by 0.5V (max 2V from pack).
   if (datalayer.battery.status.voltage_dV == 0) {
     return;  // Pack 1 has not decoded a voltage yet (aggregate holds a placeholder), nothing to freeze
   }
-  int32_t min_soc_pptt = datalayer.battery_settings.min_percentage;
-  bool below_min_soc = (int32_t)datalayer.aggregate.real_soc <= min_soc_pptt;
-  bool release = datalayer.aggregate.max_discharge_current_dA > 0 &&
-                 (int32_t)datalayer.aggregate.real_soc > (min_soc_pptt + DEYE_RELEASE_HYSTERESIS_PPTT);
+  const int32_t soc = datalayer.aggregate.real_soc;
+  const uint16_t voltage_dV = datalayer.aggregate.voltage_dV;
+  const int32_t min_soc_pptt = user_selected_inverter_deye_soc_min * 100;
+  const int32_t max_soc_pptt = user_selected_inverter_deye_soc_max * 100;
 
-  if (!deye_discharge_blocked && (below_min_soc || datalayer.aggregate.max_discharge_current_dA == 0)) {
+  // --- Charge side ---
+  if (!deye_charge_blocked && (soc >= max_soc_pptt || datalayer.aggregate.max_charge_current_dA == 0)) {
+    deye_charge_blocked = true;
+    deye_charge_voltage_dV = voltage_dV;
+    deye_charging_seconds = 0;
+  } else if (deye_charge_blocked && datalayer.aggregate.max_charge_current_dA > 0 &&
+             soc < (max_soc_pptt - DEYE_RELEASE_HYSTERESIS_PPTT)) {
+    deye_charge_blocked = false;
+  }
+  if (deye_charge_blocked) {
+    if (datalayer.aggregate.current_dA > DEYE_ACTIVE_CURRENT_DA) {
+      if (++deye_charging_seconds >= DEYE_STEP_DELAY_S) {
+        deye_charge_voltage_dV -= DEYE_BLOCK_STEP_DV;
+        deye_charging_seconds = 0;
+      }
+    } else {
+      deye_charging_seconds = 0;
+    }
+    if (deye_charge_voltage_dV < voltage_dV - DEYE_BLOCK_MAX_OFFSET_DV) {
+      deye_charge_voltage_dV = voltage_dV - DEYE_BLOCK_MAX_OFFSET_DV;
+    }
+    BYD_110.data.u8[0] = (deye_charge_voltage_dV >> 8);
+    BYD_110.data.u8[1] = (deye_charge_voltage_dV & 0x00FF);
+    //Maximum charge current 0A
+    BYD_110.data.u8[6] = 0;
+    BYD_110.data.u8[7] = 0;
+  }
+
+  // --- Discharge side ---
+  if (!deye_discharge_blocked && (soc <= min_soc_pptt || datalayer.aggregate.max_discharge_current_dA == 0)) {
     deye_discharge_blocked = true;
-    deye_block_voltage_dV = datalayer.aggregate.voltage_dV;
+    deye_discharge_voltage_dV = voltage_dV;
     deye_discharging_seconds = 0;
-  } else if (deye_discharge_blocked && release) {
+  } else if (deye_discharge_blocked && datalayer.aggregate.max_discharge_current_dA > 0 &&
+             soc > (min_soc_pptt + DEYE_RELEASE_HYSTERESIS_PPTT)) {
     deye_discharge_blocked = false;
   }
-
-  if (!deye_discharge_blocked) {
-    return;
-  }
-
-  if (datalayer.aggregate.current_dA < DEYE_DISCHARGING_DA) {
-    if (++deye_discharging_seconds >= DEYE_STEP_DELAY_S) {
-      deye_block_voltage_dV += DEYE_BLOCK_STEP_DV;
+  if (deye_discharge_blocked) {
+    if (datalayer.aggregate.current_dA < -DEYE_ACTIVE_CURRENT_DA) {
+      if (++deye_discharging_seconds >= DEYE_STEP_DELAY_S) {
+        deye_discharge_voltage_dV += DEYE_BLOCK_STEP_DV;
+        deye_discharging_seconds = 0;
+      }
+    } else {
       deye_discharging_seconds = 0;
     }
-  } else {
-    deye_discharging_seconds = 0;
+    // Never report cutoff far above pack voltage, or above charge limit
+    uint16_t max_cutoff_dV = voltage_dV + DEYE_BLOCK_MAX_OFFSET_DV;
+    uint16_t charge_voltage_dV = (BYD_110.data.u8[0] << 8) | BYD_110.data.u8[1];
+    if (max_cutoff_dV > charge_voltage_dV - VOLTAGE_OFFSET_DV) {
+      max_cutoff_dV = charge_voltage_dV - VOLTAGE_OFFSET_DV;
+    }
+    if (deye_discharge_voltage_dV > max_cutoff_dV) {
+      deye_discharge_voltage_dV = max_cutoff_dV;
+    }
+    BYD_110.data.u8[2] = (deye_discharge_voltage_dV >> 8);
+    BYD_110.data.u8[3] = (deye_discharge_voltage_dV & 0x00FF);
+    //Maximum discharge current 0A
+    BYD_110.data.u8[4] = 0;
+    BYD_110.data.u8[5] = 0;
   }
-
-  // Never report cutoff far above pack voltage, or above charge target
-  uint16_t max_block_voltage_dV = datalayer.aggregate.voltage_dV + DEYE_BLOCK_MAX_OFFSET_DV;
-  uint16_t charge_voltage_dV = (BYD_110.data.u8[0] << 8) | BYD_110.data.u8[1];
-  if (max_block_voltage_dV > charge_voltage_dV - VOLTAGE_OFFSET_DV) {
-    max_block_voltage_dV = charge_voltage_dV - VOLTAGE_OFFSET_DV;
-  }
-  if (deye_block_voltage_dV > max_block_voltage_dV) {
-    deye_block_voltage_dV = max_block_voltage_dV;
-  }
-
-  BYD_110.data.u8[2] = (deye_block_voltage_dV >> 8);
-  BYD_110.data.u8[3] = (deye_block_voltage_dV & 0x00FF);
-  //Maximum discharge current 0A
-  BYD_110.data.u8[4] = 0;
-  BYD_110.data.u8[5] = 0;
 }
 
 void BydCanInverter::map_can_frame_to_variable(CAN_frame rx_frame) {

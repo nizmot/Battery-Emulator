@@ -140,6 +140,11 @@ void init_stored_settings() {
   user_selected_inverter_foxess_modules = settings.getUInt("FOXESSMODULES", 0);
   user_selected_inverter_contactor_mode = (inverter_contactor_mode_enum)settings.getUInt("INVICNT", 0);
   user_selected_inverter_deye_workaround = settings.getBool("DEYEBYD", false);
+  user_selected_inverter_deye_voltage_limit = settings.getBool("DEYEVLIM", false);
+  uint32_t deye_soc_min = settings.getUInt("DEYESOCMIN", 10);
+  uint32_t deye_soc_max = settings.getUInt("DEYESOCMAX", 100);
+  user_selected_inverter_deye_soc_min = deye_soc_min > 100 ? 100 : deye_soc_min;
+  user_selected_inverter_deye_soc_max = deye_soc_max > 100 ? 100 : deye_soc_max;
   user_selected_inverter_offgrid = settings.getBool("INVOFFGRID", false);
   user_selected_inverter_long_CAN_timeout = settings.getBool("SLOWCANINV", false);
   user_selected_LEAF_interlock_mandatory = settings.getBool("INTERLOCKREQ", false);

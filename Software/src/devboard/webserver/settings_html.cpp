@@ -1069,6 +1069,15 @@ String raw_settings_processor(const String& var, BatteryEmulatorSettingsStore& s
   if (var == "DEYEBYD") {
     return settings.getBool("DEYEBYD") ? "checked" : "";
   }
+  if (var == "DEYEVLIM") {
+    return settings.getBool("DEYEVLIM") ? "checked" : "";
+  }
+  if (var == "DEYESOCMIN") {
+    return String(settings.getUInt("DEYESOCMIN", 10));
+  }
+  if (var == "DEYESOCMAX") {
+    return String(settings.getUInt("DEYESOCMAX", 100));
+  }
 
   if (var == "PRIMOGEN24") {
     return settings.getBool("PRIMOGEN24") ? "checked" : "";
@@ -2178,6 +2187,14 @@ String qnhck_zero_text(uint16_t zero_mV) {
         <div class="if-byd">
         <label>Deye avoid over/undercharge fix: </label>
         <input type='checkbox' name='DEYEBYD' value='on' %DEYEBYD% />
+
+        <label>Deye stop via voltage limit, SOC min/max %: </label>
+        <div style='display: flex; gap: 6px; align-items: center;'>
+        <input type='checkbox' name='DEYEVLIM' value='on' %DEYEVLIM%
+        title="Deye ignores 0A limits. Freeze voltage limit at real SOC min/max so it stops discharging/charging" />
+        <input name='DEYESOCMIN' type='text' value="%DEYESOCMIN%" pattern="[0-9]+" style='width: 3em;' title="Stop discharging at this real SOC %" />
+        <input name='DEYESOCMAX' type='text' value="%DEYESOCMAX%" pattern="[0-9]+" style='width: 3em;' title="Stop charging at this real SOC %" />
+        </div>
         </div>
 
         <div class="if-bydmodbus">

@@ -49,6 +49,9 @@ bool user_selected_inverter_long_CAN_timeout = false;
 bool user_selected_pylon_30koffset = false;
 bool user_selected_pylon_invert_byteorder = false;
 bool user_selected_inverter_deye_workaround = false;
+bool user_selected_inverter_deye_voltage_limit = false;
+uint8_t user_selected_inverter_deye_soc_min = 10;
+uint8_t user_selected_inverter_deye_soc_max = 100;
 bool user_selected_primo_gen24 =
     false;  //Used by BYD-Modbus (Fronius Primo Gen24) inverters to determine if we should cap voltage to 450V or not
 
