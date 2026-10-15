@@ -64,16 +64,8 @@ void BydCanInverter::
       //Force to 0% incase battery no longer wants to discharge
       BYD_150.data.u8[0] = 0;
       BYD_150.data.u8[1] = 0;
-      //Deye ignores 0A discharge limit and 0% SOC, but respects the discharge cutoff voltage.
-      //Raise the cutoff above current pack voltage so the inverter stops discharging
-      uint16_t discharge_block_voltage_dV = datalayer.battery.status.voltage_dV + DEYE_DISCHARGE_BLOCK_OFFSET_DV;
-      uint16_t charge_voltage_dV = (BYD_110.data.u8[0] << 8) | BYD_110.data.u8[1];
-      if (discharge_block_voltage_dV >= charge_voltage_dV) {  //Never report cutoff above charge target
-        discharge_block_voltage_dV = charge_voltage_dV - VOLTAGE_OFFSET_DV;
-      }
-      BYD_110.data.u8[2] = (discharge_block_voltage_dV >> 8);
-      BYD_110.data.u8[3] = (discharge_block_voltage_dV & 0x00FF);
     }
+    update_deye_discharge_block();
   }
   //StateOfHealth (100.00%)
   BYD_150.data.u8[2] = (datalayer.battery.status.soh_pptt >> 8);
@@ -108,6 +100,57 @@ void BydCanInverter::
   //Capacity
   BYD_250.data.u8[4] = (uint8_t)((datalayer.battery.info.reported_total_capacity_Wh / 100) >> 8);
   BYD_250.data.u8[5] = (uint8_t)(datalayer.battery.info.reported_total_capacity_Wh / 100);
+}
+
+void BydCanInverter::update_deye_discharge_block() {
+  // Deye ignores a 0A discharge limit and 0% SOC, but respects the discharge cutoff voltage.
+  // When SOC is at/below the min SOC setting (or battery allows no discharge), freeze the current pack voltage
+  // as cutoff. Since the pack sags while discharging, this is just below the resting voltage, so the inverter
+  // goes to standby instead of treating the battery as empty. If it still keeps discharging, step the cutoff up.
+  if (datalayer.battery.status.voltage_dV == 0) {
+    return;  // No valid battery data yet, nothing to freeze
+  }
+  int32_t min_soc_pptt = datalayer.battery.settings.min_percentage;
+  bool below_min_soc = (int32_t)datalayer.battery.status.real_soc <= min_soc_pptt;
+  bool release = datalayer.battery.status.max_discharge_current_dA > 0 &&
+                 (int32_t)datalayer.battery.status.real_soc > (min_soc_pptt + DEYE_RELEASE_HYSTERESIS_PPTT);
+
+  if (!deye_discharge_blocked && (below_min_soc || datalayer.battery.status.max_discharge_current_dA == 0)) {
+    deye_discharge_blocked = true;
+    deye_block_voltage_dV = datalayer.battery.status.voltage_dV;
+    deye_discharging_seconds = 0;
+  } else if (deye_discharge_blocked && release) {
+    deye_discharge_blocked = false;
+  }
+
+  if (!deye_discharge_blocked) {
+    return;
+  }
+
+  if (datalayer.battery.status.current_dA < DEYE_DISCHARGING_DA) {
+    if (++deye_discharging_seconds >= DEYE_STEP_DELAY_S) {
+      deye_block_voltage_dV += DEYE_BLOCK_STEP_DV;
+      deye_discharging_seconds = 0;
+    }
+  } else {
+    deye_discharging_seconds = 0;
+  }
+
+  // Never report cutoff far above pack voltage, or above charge target
+  uint16_t max_block_voltage_dV = datalayer.battery.status.voltage_dV + DEYE_BLOCK_MAX_OFFSET_DV;
+  uint16_t charge_voltage_dV = (BYD_110.data.u8[0] << 8) | BYD_110.data.u8[1];
+  if (max_block_voltage_dV > charge_voltage_dV - VOLTAGE_OFFSET_DV) {
+    max_block_voltage_dV = charge_voltage_dV - VOLTAGE_OFFSET_DV;
+  }
+  if (deye_block_voltage_dV > max_block_voltage_dV) {
+    deye_block_voltage_dV = max_block_voltage_dV;
+  }
+
+  BYD_110.data.u8[2] = (deye_block_voltage_dV >> 8);
+  BYD_110.data.u8[3] = (deye_block_voltage_dV & 0x00FF);
+  //Maximum discharge current 0A
+  BYD_110.data.u8[4] = 0;
+  BYD_110.data.u8[5] = 0;
 }
 
 void BydCanInverter::map_can_frame_to_variable(CAN_frame rx_frame) {
