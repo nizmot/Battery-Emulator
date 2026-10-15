@@ -30,6 +30,7 @@ class BydCanInverter : public CanInverterProtocol {
   static const uint8_t FW_MAJOR_VERSION = 0x03;
   static const uint8_t FW_MINOR_VERSION = 0x29;
   static const uint8_t VOLTAGE_OFFSET_DV = 20;
+  static const uint8_t DEYE_DISCHARGE_BLOCK_OFFSET_DV = 20;  // Cutoff voltage above pack voltage when discharge blocked
   bool initialDataSent = false;
   bool inverterStartedUp = false;
   bool useAsShunt = false;

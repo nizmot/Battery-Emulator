@@ -64,6 +64,15 @@ void BydCanInverter::
       //Force to 0% incase battery no longer wants to discharge
       BYD_150.data.u8[0] = 0;
       BYD_150.data.u8[1] = 0;
+      //Deye ignores 0A discharge limit and 0% SOC, but respects the discharge cutoff voltage.
+      //Raise the cutoff above current pack voltage so the inverter stops discharging
+      uint16_t discharge_block_voltage_dV = datalayer.battery.status.voltage_dV + DEYE_DISCHARGE_BLOCK_OFFSET_DV;
+      uint16_t charge_voltage_dV = (BYD_110.data.u8[0] << 8) | BYD_110.data.u8[1];
+      if (discharge_block_voltage_dV >= charge_voltage_dV) {  //Never report cutoff above charge target
+        discharge_block_voltage_dV = charge_voltage_dV - VOLTAGE_OFFSET_DV;
+      }
+      BYD_110.data.u8[2] = (discharge_block_voltage_dV >> 8);
+      BYD_110.data.u8[3] = (discharge_block_voltage_dV & 0x00FF);
     }
   }
   //StateOfHealth (100.00%)
