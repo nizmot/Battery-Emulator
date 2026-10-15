@@ -2,7 +2,7 @@ name: 🔋 Compile Common Images
 
 on:
   push:
-    branches: [main]
+    branches: [main, deye-fix-v13.1.0]
   pull_request:
   workflow_call:
     inputs:
